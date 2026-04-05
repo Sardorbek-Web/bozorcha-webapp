@@ -5,13 +5,19 @@ function generateOrderNumber() {
   return `BZ-${random}`;
 }
 
-export async function createOrderWithItems({ customer, items, total }) {
+export async function createOrderWithItems({
+  telegramId,
+  customer,
+  items,
+  total,
+}) {
   const orderNumber = generateOrderNumber();
 
   const { data: orderData, error: orderError } = await supabase
     .from("orders")
     .insert([
       {
+        telegram_id: telegramId || null,
         order_number: orderNumber,
         customer_full_name: customer.fullName,
         customer_phone: customer.phone,
@@ -24,9 +30,7 @@ export async function createOrderWithItems({ customer, items, total }) {
     .select()
     .single();
 
-  if (orderError) {
-    throw orderError;
-  }
+  if (orderError) throw orderError;
 
   const orderItemsPayload = items.map((item) => ({
     order_id: orderData.id,
@@ -42,23 +46,21 @@ export async function createOrderWithItems({ customer, items, total }) {
     .from("order_items")
     .insert(orderItemsPayload);
 
-  if (itemsError) {
-    throw itemsError;
-  }
+  if (itemsError) throw itemsError;
 
   return orderData;
 }
 
-export async function getOrders() {
+export async function getOrdersByTelegramId(telegramId) {
+  if (!telegramId) return [];
+
   const { data, error } = await supabase
     .from("orders")
     .select("*")
+    .eq("telegram_id", telegramId)
     .order("id", { ascending: false });
 
-  if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }
 
@@ -69,9 +71,6 @@ export async function getOrderItems(orderId) {
     .eq("order_id", orderId)
     .order("id", { ascending: true });
 
-  if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCartStore } from "../store/cartStore";
+import { useUserStore } from "../store/userStore";
 import { createOrderWithItems } from "../lib/orders";
 
 export default function CheckoutPage() {
@@ -8,14 +9,19 @@ export default function CheckoutPage() {
 
   const items = useCartStore((state) => state.items);
   const clearCart = useCartStore((state) => state.clearCart);
+  const telegramUser = useUserStore((state) => state.telegramUser);
+  const profile = useUserStore((state) => state.profile);
 
   const total = useMemo(() => {
     return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [items]);
 
   const [form, setForm] = useState({
-    fullName: "",
-    phone: "",
+    fullName:
+      [profile?.first_name || telegramUser?.first_name, profile?.last_name || telegramUser?.last_name]
+        .filter(Boolean)
+        .join(" ") || "",
+    phone: profile?.phone || "",
     address: "",
     paymentMethod: "Yetkazilganda to‘lov",
     comment: "",
@@ -34,6 +40,11 @@ export default function CheckoutPage() {
 
     if (items.length === 0) {
       setErrorText("Savat bo‘sh");
+      return;
+    }
+
+    if (!telegramUser?.id) {
+      setErrorText("Telegram foydalanuvchi topilmadi");
       return;
     }
 
@@ -57,6 +68,7 @@ export default function CheckoutPage() {
       setErrorText("");
 
       const newOrder = await createOrderWithItems({
+        telegramId: telegramUser.id,
         customer: {
           fullName: form.fullName,
           phone: form.phone,
@@ -66,6 +78,20 @@ export default function CheckoutPage() {
         },
         items,
         total,
+      });
+      await notifyTelegramAboutOrder({
+        orderNumber: newOrder.order_number,
+        customerFullName: form.fullName,
+        customerPhone: form.phone,
+        customerAddress: form.address,
+        paymentMethod: form.paymentMethod,
+        total,
+        items: items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          size: item.size || "",
+          price: item.price,
+        })),
       });
 
       clearCart();

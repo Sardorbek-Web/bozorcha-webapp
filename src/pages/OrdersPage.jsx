@@ -1,25 +1,31 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { getOrders, getOrderItems } from "../lib/orders";
+import { useUserStore } from "../store/userStore";
+import { getOrdersByTelegramId, getOrderItems } from "../lib/orders";
 
 export default function OrdersPage() {
   const location = useLocation();
   const newOrderNumber = location.state?.orderNumber;
+  const telegramUser = useUserStore((state) => state.telegramUser);
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (telegramUser?.id) {
+      loadOrders();
+    } else {
+      setLoading(false);
+    }
+  }, [telegramUser]);
 
   async function loadOrders() {
     try {
       setLoading(true);
       setErrorText("");
 
-      const ordersData = await getOrders();
+      const ordersData = await getOrdersByTelegramId(telegramUser.id);
 
       const ordersWithItems = await Promise.all(
         (ordersData || []).map(async (order) => {
@@ -52,6 +58,12 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {!telegramUser?.id && (
+        <div className="rounded-3xl bg-zinc-100 p-4 text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+          Telegram foydalanuvchi topilmadi
+        </div>
+      )}
+
       {loading && (
         <div className="rounded-3xl bg-zinc-100 p-4 text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
           Yuklanmoqda...
@@ -60,7 +72,7 @@ export default function OrdersPage() {
 
       {errorText && <p className="text-sm text-red-500">{errorText}</p>}
 
-      {!loading && !errorText && orders.length === 0 && (
+      {!loading && !errorText && telegramUser?.id && orders.length === 0 && (
         <div className="rounded-3xl bg-zinc-100 p-4 text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
           Hozircha buyurtmalar yo‘q
         </div>
